@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>Railroad Tycoon</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background-color: #000;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        #game-stream {
+            display: block;
+            position: absolute;
+            /* Will be positioned by JavaScript for old Safari compatibility */
+        }
+
+        /* Top bar */
+        #top-bar {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 200;
+            display: flex;
+            gap: 8px;
+        }
+
+        .top-btn {
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-family: Helvetica, sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .top-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .top-btn.resume {
+            background: rgba(0,100,0,0.7);
+            border-color: rgba(0,255,0,0.4);
+        }
+
+        .top-btn.resume:hover {
+            background: rgba(0,150,0,0.8);
+        }
+
+        /* Status */
+        #status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            color: #0f0;
+            font-family: Courier, monospace;
+            font-size: 11px;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 3px 6px;
+            border-radius: 3px;
+            opacity: 0.7;
+        }
+
+        .error { color: #f00 !important; }
+
+        /* Arrow pad (bottom left) */
+        #arrow-pad {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 150;
+            display: grid;
+            grid-template-columns: 45px 45px 45px;
+            grid-template-rows: 45px 45px 45px;
+            gap: 3px;
+        }
+
+        #arrow-pad .arrow-btn {
+            width: 45px;
+            height: 45px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        #arrow-pad .arrow-btn:active {
+            background: rgba(255,255,255,0.4);
+        }
+
+        #arrow-pad .arrow-btn.empty {
+            background: transparent;
+            border: none;
+        }
+
+        /* Shortcuts panel (bottom right) */
+        #shortcuts {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 150;
+            background: rgba(0,0,0,0.7);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            padding: 10px;
+            max-width: 320px;
+        }
+
+        #shortcuts .shortcut-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 6px;
+        }
+
+        #shortcuts .shortcut-row:last-child {
+            margin-bottom: 0;
+        }
+
+        #shortcuts .shortcut-label {
+            color: #888;
+            font-family: Helvetica, sans-serif;
+            font-size: 9px;
+            width: 100%;
+            margin-bottom: 2px;
+        }
+
+        .shortcut-btn {
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 4px;
+            color: #fff;
+            font-family: Helvetica, sans-serif;
+            font-size: 11px;
+            padding: 6px 10px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .shortcut-btn:active {
+            background: rgba(255,255,255,0.4);
+        }
+
+        .shortcut-btn .key {
+            font-weight: bold;
+            color: #ffcc00;
+            margin-right: 3px;
+        }
+
+        /* Mobile controls (bottom center) */
+        #mobile-controls {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 150;
+            display: none;
+        }
+
+        @media (pointer: coarse) {
+            #mobile-controls {
+                display: flex;
+                gap: 5px;
+            }
+        }
+
+        .mobile-btn {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.4);
+            border-radius: 6px;
+            color: #fff;
+            font-family: Helvetica, sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 10px 14px;
+            cursor: pointer;
+        }
+
+        .mobile-btn:active {
+            background: rgba(255,255,255,0.5);
+        }
+
+        /* Hide overlays class */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <img id="game-stream" alt="Game">
+    </div>
+
+    <!-- Top bar with controls -->
+    <div id="top-bar">
+        <button class="top-btn resume" onclick="resumeGame()">Reprendre</button>
+        <button class="top-btn" onclick="toggleOverlay()">Controles</button>
+    </div>
+    <div id="status">Connecting...</div>
+
+    <!-- Arrow pad -->
+    <div id="arrow-pad">
+        <div class="arrow-btn empty"></div>
+        <div class="arrow-btn" onclick="sendKey('Up')">&#9650;</div>
+        <div class="arrow-btn empty"></div>
+        <div class="arrow-btn" onclick="sendKey('Left')">&#9664;</div>
+        <div class="arrow-btn" onclick="sendKey('Return')">OK</div>
+        <div class="arrow-btn" onclick="sendKey('Right')">&#9654;</div>
+        <div class="arrow-btn empty"></div>
+        <div class="arrow-btn" onclick="sendKey('Down')">&#9660;</div>
+        <div class="arrow-btn empty"></div>
+    </div>
+
+    <!-- Shortcuts panel - Civ 2 specific -->
+    <div id="shortcuts">
+        <div class="shortcut-row">
+            <span class="shortcut-label">MENU</span>
+            <button class="shortcut-btn" onclick="sendKey('Escape')"><span class="key">ESC</span>Menu</button>
+            <button class="shortcut-btn" onclick="sendKey('Return')"><span class="key">ENTER</span></button>
+            <button class="shortcut-btn" onclick="sendKey('space')"><span class="key">SPACE</span>Skip</button>
+        </div>
+        <div class="shortcut-row">
+            <span class="shortcut-label">UNITES</span>
+            <button class="shortcut-btn" onclick="sendKey('w')"><span class="key">W</span>Wait</button>
+            <button class="shortcut-btn" onclick="sendKey('f')"><span class="key">F</span>Fortify</button>
+            <button class="shortcut-btn" onclick="sendKey('s')"><span class="key">S</span>Sentry</button>
+            <button class="shortcut-btn" onclick="sendKey('g')"><span class="key">G</span>GoTo</button>
+            <button class="shortcut-btn" onclick="sendKey('h')"><span class="key">H</span>Home</button>
+        </div>
+        <div class="shortcut-row">
+            <span class="shortcut-label">CONSTRUCTION</span>
+            <button class="shortcut-btn" onclick="sendKey('b')"><span class="key">B</span>Build</button>
+            <button class="shortcut-btn" onclick="sendKey('r')"><span class="key">R</span>Road</button>
+            <button class="shortcut-btn" onclick="sendKey('i')"><span class="key">I</span>Irrigate</button>
+            <button class="shortcut-btn" onclick="sendKey('m')"><span class="key">M</span>Mine</button>
+            <button class="shortcut-btn" onclick="sendKey('o')"><span class="key">O</span>Fortress</button>
+            <button class="shortcut-btn" onclick="sendKey('p')"><span class="key">P</span>Airbase</button>
+        </div>
+        <div class="shortcut-row">
+            <span class="shortcut-label">ADVISORS</span>
+            <button class="shortcut-btn" onclick="sendKey('F1')"><span class="key">F1</span>Science</button>
+            <button class="shortcut-btn" onclick="sendKey('F2')"><span class="key">F2</span>Tax</button>
+            <button class="shortcut-btn" onclick="sendKey('F3')"><span class="key">F3</span>Trade</button>
+            <button class="shortcut-btn" onclick="sendKey('F4')"><span class="key">F4</span>Diplo</button>
+        </div>
+        <div class="shortcut-row">
+            <span class="shortcut-label">FICHIER</span>
+            <button class="shortcut-btn" onclick="sendKey('ctrl+s')"><span class="key">Ctrl+S</span>Save</button>
+            <button class="shortcut-btn" onclick="sendKey('ctrl+l')"><span class="key">Ctrl+L</span>Load</button>
+            <button class="shortcut-btn" onclick="sendKey('y')"><span class="key">Y</span>Yes</button>
+            <button class="shortcut-btn" onclick="sendKey('n')"><span class="key">N</span>No</button>
+        </div>
+    </div>
+
+    <!-- Mobile simplified controls -->
+    <div id="mobile-controls">
+        <button class="mobile-btn" onclick="sendKey('Escape')">ESC</button>
+        <button class="mobile-btn" onclick="sendKey('Return')">ENTER</button>
+        <button class="mobile-btn" onclick="sendKey('space')">SPACE</button>
+    </div>
+
+    <script type="text/javascript">
+    (function() {
+        var streamImg = document.getElementById('game-stream');
+        var statusEl = document.getElementById('status');
+        var arrowPad = document.getElementById('arrow-pad');
+        var shortcuts = document.getElementById('shortcuts');
+        var gameContainer = document.getElementById('game-container');
+        var overlayVisible = true;
+
+        var inputQueue = [];
+        var processingInput = false;
+        var GAME_WIDTH = 640;
+        var GAME_HEIGHT = 480;
+        var GAME_RATIO = GAME_WIDTH / GAME_HEIGHT; // 4:3
+
+        // Frame polling configuration
+        var FRAME_INTERVAL = 83; // ~12 FPS (1000/12)
+        var frameCount = 0;
+        var lastFrameTime = 0;
+        var polling = false;
+
+        // Manual "object-fit: contain" for old Safari
+        function resizeImage() {
+            var containerWidth = window.innerWidth;
+            var containerHeight = window.innerHeight;
+            var containerRatio = containerWidth / containerHeight;
+
+            var imgWidth, imgHeight, imgLeft, imgTop;
+
+            if (containerRatio > GAME_RATIO) {
+                // Container is wider than game - fit to height
+                imgHeight = containerHeight;
+                imgWidth = Math.round(containerHeight * GAME_RATIO);
+            } else {
+                // Container is taller than game - fit to width
+                imgWidth = containerWidth;
+                imgHeight = Math.round(containerWidth / GAME_RATIO);
+            }
+
+            imgLeft = Math.round((containerWidth - imgWidth) / 2);
+            imgTop = Math.round((containerHeight - imgHeight) / 2);
+
+            streamImg.style.width = imgWidth + 'px';
+            streamImg.style.height = imgHeight + 'px';
+            streamImg.style.left = imgLeft + 'px';
+            streamImg.style.top = imgTop + 'px';
+        }
+
+        // Resize on load and window resize
+        window.addEventListener('resize', resizeImage, false);
+        window.addEventListener('orientationchange', function() {
+            setTimeout(resizeImage, 100);
+        }, false);
+        resizeImage();
+
+        // Toggle overlay visibility
+        window.toggleOverlay = function() {
+            overlayVisible = !overlayVisible;
+            if (overlayVisible) {
+                arrowPad.classList.remove('hidden');
+                shortcuts.classList.remove('hidden');
+            } else {
+                arrowPad.classList.add('hidden');
+                shortcuts.classList.add('hidden');
+            }
+        };
+
+        // Resume game - Civ 2 uses Ctrl+L for Load
+        window.resumeGame = function() {
+            setStatus('Loading saved game...');
+            sendKey('ctrl+l');
+            setTimeout(function() {
+                sendKey('Return');
+            }, 500);
+        };
+
+        function setStatus(msg, isError) {
+            statusEl.innerHTML = msg;
+            statusEl.className = isError ? 'error' : '';
+        }
+
+        // Frame polling - fetch new frame from server
+        function fetchFrame() {
+            if (!polling) return;
+
+            var img = new Image();
+            var startTime = Date.now();
+
+            img.onload = function() {
+                streamImg.src = img.src;
+                frameCount++;
+
+                // Ensure image is properly sized on first frame
+                if (frameCount === 1) {
+                    resizeImage();
+                }
+
+                // Calculate FPS every second
+                var now = Date.now();
+                if (now - lastFrameTime >= 1000) {
+                    setStatus('OK - ' + frameCount + ' FPS');
+                    frameCount = 0;
+                    lastFrameTime = now;
+                }
+
+                // Schedule next frame
+                if (polling) {
+                    var elapsed = Date.now() - startTime;
+                    var delay = Math.max(0, FRAME_INTERVAL - elapsed);
+                    setTimeout(fetchFrame, delay);
+                }
+            };
+
+            img.onerror = function() {
+                setStatus('Frame error', true);
+                // Retry after delay
+                if (polling) {
+                    setTimeout(fetchFrame, 500);
+                }
+            };
+
+            // Add timestamp to prevent caching
+            img.src = '/frame.jpg?_=' + Date.now();
+        }
+
+        // Start frame polling
+        function startPolling() {
+            if (!polling) {
+                polling = true;
+                lastFrameTime = Date.now();
+                frameCount = 0;
+                setStatus('Connecting...');
+                fetchFrame();
+            }
+        }
+
+        // Stop frame polling
+        function stopPolling() {
+            polling = false;
+        }
+
+        function sendInput(params, callback) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/input', true);
+            xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (callback) callback(xhr.status === 200);
+                }
+            };
+            xhr.send(params);
+        }
+
+        function processInputQueue() {
+            if (processingInput || inputQueue.length === 0) return;
+            processingInput = true;
+            var params = inputQueue.shift();
+            sendInput(params, function(success) {
+                processingInput = false;
+                if (inputQueue.length > 0) processInputQueue();
+            });
+        }
+
+        function queueClick(x, y, isRightClick) {
+            var type = isRightClick ? 'rightclick' : 'click';
+            inputQueue.push('type=' + type + '&x=' + x + '&y=' + y);
+            processInputQueue();
+        }
+
+        window.sendKey = function(key) {
+            inputQueue.push('type=key&key=' + encodeURIComponent(key));
+            processInputQueue();
+        };
+
+        // Touch handling
+        var touchStart = null;
+        var touchTimeout = null;
+
+        function getTouchPosition(touch) {
+            var rect = streamImg.getBoundingClientRect();
+            var x = touch.clientX - rect.left;
+            var y = touch.clientY - rect.top;
+            return {
+                x: Math.round(x * GAME_WIDTH / rect.width),
+                y: Math.round(y * GAME_HEIGHT / rect.height)
+            };
+        }
+
+        streamImg.addEventListener('touchstart', function(e) {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                var pos = getTouchPosition(e.touches[0]);
+                touchStart = { time: Date.now(), x: pos.x, y: pos.y };
+                touchTimeout = setTimeout(function() {
+                    if (touchStart) {
+                        queueClick(touchStart.x, touchStart.y, true);
+                        touchStart = null;
+                    }
+                }, 500);
+            }
+        }, false);
+
+        streamImg.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            if (touchTimeout) { clearTimeout(touchTimeout); touchTimeout = null; }
+            if (touchStart && (Date.now() - touchStart.time) < 500) {
+                queueClick(touchStart.x, touchStart.y, false);
+            }
+            touchStart = null;
+        }, false);
+
+        streamImg.addEventListener('touchmove', function(e) {
+            e.preventDefault();
+            if (touchTimeout) { clearTimeout(touchTimeout); touchTimeout = null; }
+        }, false);
+
+        // Mouse click handling
+        streamImg.addEventListener('click', function(e) {
+            var rect = streamImg.getBoundingClientRect();
+            var x = Math.round((e.clientX - rect.left) * GAME_WIDTH / rect.width);
+            var y = Math.round((e.clientY - rect.top) * GAME_HEIGHT / rect.height);
+            queueClick(x, y, false);
+        }, false);
+
+        streamImg.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            var rect = streamImg.getBoundingClientRect();
+            var x = Math.round((e.clientX - rect.left) * GAME_WIDTH / rect.width);
+            var y = Math.round((e.clientY - rect.top) * GAME_HEIGHT / rect.height);
+            queueClick(x, y, true);
+            return false;
+        }, false);
+
+        // Keyboard handling
+        document.addEventListener('keydown', function(e) {
+            var keyMap = {
+                'Enter': 'Return', 'Escape': 'Escape', ' ': 'space',
+                'ArrowUp': 'Up', 'ArrowDown': 'Down', 'ArrowLeft': 'Left', 'ArrowRight': 'Right',
+                'Tab': 'Tab', 'Backspace': 'BackSpace', 'Delete': 'Delete',
+                'F1': 'F1', 'F2': 'F2', 'F3': 'F3', 'F4': 'F4', 'F5': 'F5',
+                'F6': 'F6', 'F7': 'F7', 'F8': 'F8', 'F9': 'F9', 'F10': 'F10'
+            };
+            var xdotoolKey = keyMap[e.key] || e.key;
+
+            // Handle Ctrl combinations
+            if (e.ctrlKey && e.key.length === 1) {
+                xdotoolKey = 'ctrl+' + e.key.toLowerCase();
+            }
+
+            if (xdotoolKey.length === 1 || keyMap[e.key] || e.ctrlKey) {
+                e.preventDefault();
+                sendKey(xdotoolKey);
+            }
+        }, false);
+
+        // Prevent scrolling
+        document.addEventListener('touchmove', function(e) { e.preventDefault(); }, false);
+
+        // Start polling on page load
+        startPolling();
+
+        // Handle visibility change - pause/resume polling
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                startPolling();
+            }
+        }, false);
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  railroad-tycoon-streaming:
+    build: .
+    container_name: railroad-tycoon-streaming
+    ports:
+      - "8082:8081"
+    volumes:
+      # Mount game files (read-write for saves)
+      - ./games:/games
+      # Optional: mount config for easy editing without rebuild
+      - ./dosbox-x-config:/dosbox-x-config:ro
+    environment:
+      - DISPLAY=:99
+    restart: unless-stopped
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    # Required for xdotool to work
+    security_opt:
+      - seccomp:unconfined

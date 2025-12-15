@@ -1,0 +1,37 @@
+# Game files (large, not committed to repo)
+games/
+*.rar
+*.zip
+*.7z
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Docker
+*.tar
+
+# Test files
+test-frame.jpg
+nul
+
+# Playwright MCP
+.playwright-mcp/
+
+# MCP config (local)
+.mcp.json
